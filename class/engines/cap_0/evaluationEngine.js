@@ -609,16 +609,18 @@ function valida(validar, resultadoExamen, def, artefact, borderColor, propiedade
                 if (classList.contains('passInLibrary')) {
                     console.log('Punto ' + (i + 1) + ' acertado');
                     resultadoExamen[idx].items[indx] = 1;
+                    classList.remove('passInLibrary');
                     indx++;
                 }
                 else if (classList.contains('failedInLibrary')) {
                     console.log('Punto ' + (i + 1) + ' fallado');
                     resultadoExamen[idx].items[indx] = 0;
+                    classList.remove('failedInLibrary');
                     indx++;
                 }
             }
             guardarResultados(resultadoExamen);
-        }, 10);
+        }, 0);
     };
 
     for (let i = 0; i < validar.length; i++) {
