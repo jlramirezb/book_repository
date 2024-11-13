@@ -942,7 +942,163 @@ function filtrarObjeto(objetoDef, arregloPropiedades) {
 
 //soltar el pdf de la evaluacion
 function printEvaluation() {
-
+        if(tipo=='Est'){
+            document.getElementById('myModal').style.display = 'none';    
+        }
+        document.getElementById("pdf").addEventListener("click", function() {
+            // Función para renderizar LaTeX a SVG
+            function latexToSVG(latex) {
+                try {
+                    const svg = MathJax.tex2svg(latex, {display: false});
+                    return svg.outerHTML;
+                } catch (error) {
+                    console.error('Error al renderizar LaTeX:', error);
+                    return '';
+                }
+            }
+    
+            // Función para procesar los elementos math-field
+            function processMathFields(section, classes, isQuestion2 = false) {
+                const fields = section.querySelectorAll(classes.map(c => `math-field.${c}`).join(', '));
+                let inpEngInt1Count = 0;
+                let inpEngInt2Count = 0;
+    
+                fields.forEach((field) => {
+                    if (!field.parentNode) {
+                        console.warn('Elemento math-field sin padre encontrado, saltando...');
+                        return;
+                    }
+    
+                    let mathContent = field.getValue();
+                    let svgContent = '';
+    
+                    if (field.classList.contains('colorInput') || (isQuestion2 && field.classList.contains('textBottom'))) {
+                        svgContent = latexToSVG(mathContent);
+                    } else {
+                        // Para otros elementos, mantener el contenido original
+                        if (field.shadowRoot && field.shadowRoot.querySelector('.ML__mathlive')) {
+                            svgContent = field.shadowRoot.querySelector('.ML__mathlive').innerHTML;
+                        } else {
+                            svgContent = mathContent;
+                        }
+                    }
+    
+                    const mathDiv = document.createElement('div');
+                    mathDiv.className = field.className;
+                    mathDiv.style.cssText = field.style.cssText;
+                    mathDiv.innerHTML = svgContent;
+    
+                    mathDiv.style.display = 'inline-block';
+                    mathDiv.style.width = field.offsetWidth + 'px';
+                    mathDiv.style.height = field.offsetHeight + 'px';
+    
+                    // Centrar el contenido del mathDiv
+                    mathDiv.style.display = 'flex';
+                    mathDiv.style.justifyContent = 'center';
+                    mathDiv.style.alignItems = 'center';
+    
+                    // Manejar elementos colorInput e inputColor
+                    if (field.classList.contains('colorInput') || field.classList.contains('inputColor')) {
+                        const backgroundColor = window.getComputedStyle(field).backgroundColor;
+                        mathDiv.style.backgroundColor = backgroundColor;
+                        mathDiv.style.visibility = 'visible';
+                        mathDiv.style.opacity = '1';
+                        
+                        // Asegurarse de que el contenido sea visible
+                        if (backgroundColor !== 'rgba(0, 0, 0, 0)' && backgroundColor !== 'transparent') {
+                            mathDiv.style.color = 'black'; // o 'white' dependiendo del color de fondo
+                        }
+                        
+                        // Si el contenido está vacío, mostrar un espacio para que el color de fondo sea visible
+                        if (!mathDiv.textContent.trim()) {
+                            mathDiv.innerHTML = '&nbsp;';
+                        }
+                    }
+    
+                    // Forzar la visibilidad para los tres primeros inpEngInt1
+                    if (field.classList.contains('inpEngInt1') && inpEngInt1Count < 3) {
+                        mathDiv.style.visibility = 'visible';
+                        mathDiv.style.opacity = '1';
+                        inpEngInt1Count++;
+                    }
+    
+                    // Forzar la visibilidad para los dos primeros inpEngInt2
+                    if (field.classList.contains('inpEngInt2') && inpEngInt2Count < 2) {
+                        mathDiv.style.visibility = 'visible';
+                        mathDiv.style.opacity = '1';
+                        inpEngInt2Count++;
+                    }
+    
+                    field.parentNode.replaceChild(mathDiv, field);
+                });
+            }
+    
+            // Obtener section1, pregunta1 y pregunta2
+            const section1 = document.getElementById('section1');
+            const pregunta1 = document.getElementById('pregunta1');
+            const pregunta2 = document.getElementById('pregunta2');
+    
+            // Crear un contenedor para todas las secciones
+            const container = document.createElement('div');
+    
+            // Agregar section1 sin procesar
+            if (section1) {
+                container.appendChild(section1.cloneNode(true));
+            } else {
+                console.error('No se encontró el elemento section1');
+            }
+    
+            // Procesar y agregar pregunta1
+            if (pregunta1) {
+                processMathFields(pregunta1, ['inpEngInt1', 'inpEngInt2', 'textBottom', 'inputColor', 'colorInput']);
+                container.appendChild(pregunta1.cloneNode(true));
+            } else {
+                console.error('No se encontró el elemento pregunta1');
+            }
+    
+            // Agregar un salto de página antes de pregunta2
+            const pageBreak = document.createElement('div');
+            pageBreak.style.pageBreakAfter = 'always';
+            container.appendChild(pageBreak);
+    
+            // Procesar y agregar pregunta2
+            if (pregunta2) {
+                processMathFields(pregunta2, ['colorInput', 'textBottom'], true);
+                container.appendChild(pregunta2.cloneNode(true));
+            } else {
+                console.error('No se encontró el elemento pregunta2');
+            }
+    
+            // Obtener el ancho de pregunta1
+            const pregunta1Width = pregunta1 ? pregunta1.offsetWidth : 0;
+    
+            // Convertir el ancho de píxeles a puntos (1 punto = 1/72 pulgada)
+            const widthInPoints = pregunta1Width * (72 / 96); // Asumiendo 96 DPI
+    
+            // Configuraciones para generar el PDF
+            var opt = {
+                margin: 10,
+                filename: 'examen.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { 
+                    scale: 1, // Reducir la escala para evitar que los elementos sean demasiado grandes
+                    useCORS: true,
+                    letterRendering: true
+                },
+                jsPDF: { 
+                    unit: 'pt', 
+    
+                    format: [widthInPoints + 20, 2000], // Ancho de pregunta1 + 20 puntos de margen, altura fija de 11 pulgadas (792 puntos)
+                    orientation: 'portrait' 
+                }
+            };
+    
+            // Generar el PDF
+            html2pdf().from(container).set(opt).save(); 
+            if(tipo=='Est'){
+                document.getElementById('confirmBtn').click();
+            }       
+        });    
 }
 
 function markBorders() {
